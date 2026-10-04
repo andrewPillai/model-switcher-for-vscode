@@ -199,7 +199,7 @@ function connectionError(status) {
     return 'The API key does not have access to this model (HTTP 403). Check your provider account and model permissions.';
   }
   if (status === 404) {
-    return 'The provider could not find this model or endpoint (HTTP 404). Copy the exact API model ID from the provider sample request, including any prefix such as "nvidia/".';
+    return 'The provider could not find this model or endpoint (HTTP 404). Copy the exact API model ID from the provider sample request, including any required organization or provider prefix.';
   }
   if (status === 429) {
     return 'The provider rate limit or account quota was reached (HTTP 429). Check your provider account and try again later.';

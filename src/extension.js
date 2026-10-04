@@ -53,7 +53,7 @@ function activate(context) {
       const profiles = context.globalState.get(profileStateKey, []);
       const profile = profiles.find(candidate => candidate.id === model.id);
       if (!profile) {
-        throw new Error('This model is no longer configured. Run "NVIDIA Chat Models: Apply Model Configuration".');
+        throw new Error('This model is no longer configured. Run "Model Switcher: Apply Model Configuration", then select the updated model in a new chat.');
       }
       const apiKey = await context.secrets.get(secretKey(profile));
       if (!apiKey) {
@@ -183,7 +183,7 @@ async function applyConfig(context, configPath, emitter) {
     });
     const guidance = changedModels
       ? 'Model IDs or endpoints changed. Start a new chat and reselect a model to clear any stale selection.'
-      : 'Select a model from the Chat picker. Use "NVIDIA Chat Models: Test Model Connection" to verify its ID, endpoint, and API key first.';
+      : 'Select a model from the Chat picker. Use "Model Switcher: Test Model Connection" to verify its ID, endpoint, and API key first.';
     vscode.window.showInformationMessage(`Configured ${profiles.length} API model${profiles.length === 1 ? '' : 's'}. ${guidance}`);
   } catch (error) {
     vscode.window.showErrorMessage(`Could not apply model configuration: ${error.message}`);
@@ -205,7 +205,7 @@ async function testConfiguredModel(context) {
       }
     }
     if (!available.length) {
-      vscode.window.showWarningMessage('No models with saved API keys are configured. Apply your model configuration first.');
+      vscode.window.showWarningMessage('No models with saved API keys are configured. Run "Model Switcher: Apply Model Configuration" first.');
       return;
     }
 

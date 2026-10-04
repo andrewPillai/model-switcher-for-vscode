@@ -1,14 +1,24 @@
-# NVIDIA Chat Model Switcher
+# Model Switcher for VS Code
 
-A VS Code extension that adds OpenAI Chat Completions-compatible models to the
-Chat model picker. Model IDs and endpoints are configured in a JSON file. API
-keys are entered in a secure VS Code prompt and stored in VS Code SecretStorage,
-never in the JSON file.
+Add your own API-backed models to the VS Code Chat model picker. Set a model
+name, its exact provider API model ID, and an endpoint; the API key is entered
+separately and stored in VS Code's secure SecretStorage.
+
+## Compatibility
+
+The model endpoint must implement the **OpenAI-compatible Chat Completions
+API**, including streaming for normal chat. Tool calling is supported when the
+provider and model support OpenAI-style function tools. You can use compatible
+cloud providers, gateways, or self-hosted endpoints; a key and a model name
+alone are not enough if the provider uses an incompatible native API.
+
+Anthropic Messages, Google Gemini's native API, and other provider-specific
+protocols are not supported unless your provider also offers an
+OpenAI-compatible Chat Completions endpoint.
 
 ## Install
 
-1. Download the latest
-   [NVIDIA Chat Model Switcher VSIX](https://github.com/andrewPillai/nvidia-extension-installer/releases/latest).
+1. Download the latest [Model Switcher for VS Code VSIX](https://github.com/andrewPillai/nvidia-extension-installer/releases/latest).
 2. In the VS Code desktop app, open **Extensions → … → Install from VSIX…**
    and select the downloaded `.vsix` file.
 3. If the extension's commands do not appear after installation, enable it for
@@ -21,54 +31,56 @@ never in the JSON file.
    ```
 
    Then quit VS Code with **⌘Q**, reopen it, and use **F1** (or **fn+F1**) to
-   find the extension commands. In VS Code, check **Profiles: Switch Profile**
-   if you use a profile other than Default. A locally installed extension also
-   needs to be installed in the remote environment when using SSH or Codespaces.
+   find the **Model Switcher** commands. Check **Profiles: Switch Profile** if
+   you use a profile other than Default. In an SSH or Codespaces window, the
+   extension must also be installed in the remote environment.
 
 ## Configure and verify
 
-1. Run **NVIDIA Chat Models: Open Model Configuration** from the Command
-   Palette.
-2. For each model you want to use, set:
-   - `name`: any friendly label for the model picker.
-   - `modelId`: copy the exact API model ID from the provider's sample request
-     (`"model": "..."`). Include the provider prefix if shown, for example
-     `nvidia/nemotron-3-ultra-550b-a55b`. A display name by itself is not
-     necessarily the API model ID.
-   - `endpoint`: the full Chat Completions URL. NVIDIA NIM uses
-     `https://integrate.api.nvidia.com/v1/chat/completions`. A base URL ending
-     in `/v1` is also accepted; the extension adds `/chat/completions`.
-3. Delete any unused, partially filled starter rows (or fill all three fields).
-   Save the file.
-4. Run **NVIDIA Chat Models: Apply Model Configuration**. Enter API keys in
-   VS Code's password prompt. Do not add keys to the configuration file.
-5. Run **NVIDIA Chat Models: Test Model Connection**, choose a model, and
-   confirm the small test request. The request uses one output token and may
-   incur a small charge from the model provider. A successful test verifies
-   the model ID, endpoint, and API key before you select the model in Chat.
-6. Select the model from the Chat model picker. If you changed a model ID or
-   endpoint, start a **new chat** and select the updated model again to clear a
-   stale selection.
+1. Run **Model Switcher: Open Model Configuration** from the Command Palette.
+2. For every model you want to add, fill in:
+   - `name`: a friendly label shown in the model picker.
+   - `modelId`: the exact model identifier from your provider's API sample,
+     copied from the value of `"model": "..."`. Include any required prefix.
+     The human-readable product name may not be the API model ID.
+   - `endpoint`: the provider's OpenAI-compatible Chat Completions URL. A full
+     URL such as `https://api.example.com/v1/chat/completions` or a base URL
+     ending in `/v1` is accepted.
+3. Leave an unused row completely blank or remove it; partially completed rows
+   are rejected. Duplicate rows in the `models` array to add more models.
+4. Save the file and run **Model Switcher: Apply Model Configuration**. Enter
+   the API key in VS Code's password prompt. **Do not add keys to the JSON file.**
+5. Run **Model Switcher: Test Model Connection**, select a model, and confirm
+   the small test request. It uses one output token and may incur a small
+   provider charge. A successful test checks the model ID, endpoint, and key
+   before you select that model in Chat.
+6. Select the model from Chat's model picker. After changing a model ID or
+   endpoint, start a **new chat** and select the updated model to clear stale
+   selections.
 
-The endpoint must support streaming OpenAI Chat Completions for normal chat,
-including tool calls for agent mode. Provider-specific APIs such as Anthropic
-Messages are not supported unless the provider also exposes a compatible
-Chat Completions endpoint.
+Example entry (replace these example values with your provider's details):
 
-## Common errors
+```json
+{
+  "name": "My hosted model",
+  "modelId": "provider/model-id-from-api-example",
+  "endpoint": "https://api.example.com/v1/chat/completions"
+}
+```
 
-The **Test Model Connection** command gives actionable messages for common
-provider responses:
+## Troubleshooting
+
+The connection test provides explanations for common HTTP errors:
 
 - **401**: the API key was rejected; replace the saved key.
 - **403**: the key lacks permission to use that model.
 - **404**: the model ID or endpoint was not found; verify the exact API model
-  ID, including any provider prefix.
+  ID, including any required prefix.
 - **429**: a rate limit or account quota was reached.
 - **5xx**: the provider returned a server error; retry later.
 
-If a model-selection error says a model is unavailable after you edit its ID,
-open a new chat and select the updated model from the picker.
+If VS Code says a selected model is unavailable after you edit its ID, start a
+new chat and choose that model again from the picker.
 
 ## Build and test
 
@@ -80,3 +92,8 @@ npm run package
 
 The VSIX is written to this directory. Never commit API keys or place them in
 `model-profiles.json`, source code, or chat messages.
+
+The package's technical extension identifier remains
+`local-development.nvidia-chat-model-switcher` so existing installations can
+upgrade in place; the user-facing extension name and commands are provider
+neutral.

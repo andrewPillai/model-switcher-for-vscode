@@ -56,18 +56,16 @@ test('validates profiles, ignores empty placeholders, and rejects keys in config
   }), /more than once/);
 });
 
-test('ships friendly model labels without guessing provider model IDs', () => {
+test('ships a provider-neutral template without guessing API model IDs', () => {
   const configPath = path.join(__dirname, '..', 'model-profiles.json');
   const models = JSON.parse(fs.readFileSync(configPath, 'utf8')).models;
-  assert.deepEqual(models.map(model => model.name), [
-    'Nemotron 3.5 Lightning 30B A3B',
-    'Kimi K3',
-    'Gemma 4 31B IT',
-    ''
-  ]);
+  assert.equal(models.length, 4);
+  assert.ok(models.every(model => model.name === '' && model.modelId === '' && model.endpoint === ''));
+  assert.equal(validateProfiles({ models: [] }).length, 0);
   assert.ok(models.every(model => model.modelId === ''));
-  assert.ok(models.slice(0, 3).every(model => model.endpoint === 'https://integrate.api.nvidia.com/v1/chat/completions'));
-  assert.throws(() => validateProfiles(JSON.parse(fs.readFileSync(configPath, 'utf8'))), /exact API modelId/);
+  assert.throws(() => validateProfiles({
+    models: [{ name: 'Hosted model', modelId: '', endpoint: 'https://api.example.com/v1' }]
+  }), /exact API modelId/);
 });
 
 test('registers every user-facing command for command-palette activation', () => {
@@ -76,6 +74,8 @@ test('registers every user-facing command for command-palette activation', () =>
     assert.ok(manifest.activationEvents.includes(`onCommand:${command}`), `${command} should activate the extension`);
   }
   assert.ok(commands.includes('nvidia-chat-model-switcher.testModel'));
+  assert.equal(manifest.displayName, 'Model Switcher for VS Code');
+  assert.ok(manifest.contributes.commands.every(command => command.title.startsWith('Model Switcher:')));
 });
 
 test('maps assistant tool calls and tool results to OpenAI chat messages', () => {

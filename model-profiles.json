@@ -1,19 +1,19 @@
 {
   "models": [
     {
-      "name": "Nemotron 3.5 Lightning 30B A3B",
+      "name": "",
       "modelId": "",
-      "endpoint": "https://integrate.api.nvidia.com/v1/chat/completions"
+      "endpoint": ""
     },
     {
-      "name": "Kimi K3",
+      "name": "",
       "modelId": "",
-      "endpoint": "https://integrate.api.nvidia.com/v1/chat/completions"
+      "endpoint": ""
     },
     {
-      "name": "Gemma 4 31B IT",
+      "name": "",
       "modelId": "",
-      "endpoint": "https://integrate.api.nvidia.com/v1/chat/completions"
+      "endpoint": ""
     },
     {
       "name": "",
