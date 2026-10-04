@@ -13,6 +13,8 @@ const {
 const vendor = 'nvidia-chat-model-switcher';
 const profileStateKey = 'profiles';
 const templateName = 'model-profiles.json';
+const ollamaDefaultEndpoint = 'http://localhost:11434/v1/chat/completions';
+const ollamaModelsEndpoint = 'http://localhost:11434/v1/models';
 
 function secretKey(profile) {
   const fingerprint = crypto
@@ -81,7 +83,8 @@ function activate(context) {
     vscode.lm.registerLanguageModelChatProvider(vendor, provider),
     vscode.commands.registerCommand('nvidia-chat-model-switcher.openConfig', () => openConfig(context, configPath)),
     vscode.commands.registerCommand('nvidia-chat-model-switcher.applyConfig', () => applyConfig(context, configPath, emitter)),
-    vscode.commands.registerCommand('nvidia-chat-model-switcher.testModel', () => testConfiguredModel(context))
+    vscode.commands.registerCommand('nvidia-chat-model-switcher.testModel', () => testConfiguredModel(context)),
+    vscode.commands.registerCommand('nvidia-chat-model-switcher.detectOllama', () => detectAndConfigureOllama(context, configPath, emitter))
   );
   ensureConfigFile(context, configPath).catch(error => {
     vscode.window.showErrorMessage(`Could not create the model configuration file: ${error.message}`);
@@ -233,6 +236,108 @@ async function testConfiguredModel(context) {
     vscode.window.showInformationMessage(`${selected.profile.name} responded successfully. Its model ID, endpoint, and API key are working.`);
   } catch (error) {
     vscode.window.showErrorMessage(`Model connection test failed: ${error.message}`);
+  }
+}
+
+async function detectAndConfigureOllama(context, configPath, emitter) {
+  try {
+    // Check if Ollama is running
+    let modelsResponse;
+    try {
+      const response = await fetch(ollamaModelsEndpoint);
+      if (!response.ok) {
+        throw new Error(`Ollama responded with ${response.status}`);
+      }
+      modelsResponse = await response.json();
+    } catch (error) {
+      const action = await vscode.window.showErrorMessage(
+        'Could not connect to Ollama at http://localhost:11434. Is Ollama running?',
+        'Open Ollama Website',
+        'Retry'
+      );
+      if (action === 'Open Ollama Website') {
+        vscode.env.openExternal(vscode.Uri.parse('https://ollama.com'));
+      } else if (action === 'Retry') {
+        return detectAndConfigureOllama(context, configPath, emitter);
+      }
+      return;
+    }
+
+    const models = modelsResponse.data || [];
+    if (!models.length) {
+      vscode.window.showInformationMessage('No models found in Ollama. Pull a model first with `ollama pull <model>`.');
+      return;
+    }
+
+    // Let user select which models to add
+    const modelItems = models.map(model => ({
+      label: model.id,
+      description: `Owned by: ${model.owned_by || 'unknown'}`,
+      modelId: model.id,
+      picked: false
+    }));
+
+    const selected = await vscode.window.showQuickPick(modelItems, {
+      title: 'Select Ollama models to add to Model Switcher',
+      placeHolder: 'Pick one or more models (use checkboxes)',
+      canPickMany: true
+    });
+
+    if (!selected || !selected.length) {
+      return;
+    }
+
+    // Read existing config
+    await ensureConfigFile(context, configPath);
+    let existingProfiles = [];
+    try {
+      const source = await fs.readFile(configPath, 'utf8');
+      const parsed = JSON.parse(source);
+      existingProfiles = validateProfiles(parsed);
+    } catch {
+      // Config might be empty or invalid, start fresh
+    }
+
+    // Build new profiles for selected models
+    const newProfiles = selected.map(item => {
+      // Generate a friendly name
+      const name = item.modelId
+        .replace(/[:/]/g, ' ')
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+
+      return {
+        name: `${name} (Ollama)`,
+        modelId: item.modelId,
+        endpoint: ollamaDefaultEndpoint,
+        rpmLimit: 0
+      };
+    });
+
+    // Merge with existing (avoid duplicates by modelId + endpoint)
+    const merged = [...existingProfiles];
+    for (const newProfile of newProfiles) {
+      const exists = merged.some(p => 
+        p.modelId === newProfile.modelId && p.endpoint === newProfile.endpoint
+      );
+      if (!exists) {
+        merged.push(newProfile);
+      }
+    }
+
+    // Write back to config file
+    const configContent = { models: merged };
+    await fs.writeFile(configPath, JSON.stringify(configContent, null, 2));
+
+    // Apply configuration (will prompt for API keys - user can press Escape for Ollama)
+    await applyConfig(context, configPath, emitter);
+
+    vscode.window.showInformationMessage(
+      `Added ${selected.length} Ollama model${selected.length === 1 ? '' : 's'}. ` +
+      'No API key needed for local Ollama - press Escape when prompted.'
+    );
+  } catch (error) {
+    vscode.window.showErrorMessage(`Failed to detect Ollama models: ${error.message}`);
   }
 }
 

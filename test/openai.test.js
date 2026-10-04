@@ -56,13 +56,19 @@ test('validates profiles, ignores empty placeholders, and rejects keys in config
   }), /more than once/);
 });
 
-test('ships a provider-neutral template without guessing API model IDs', () => {
+test('ships a template with Ollama examples and empty placeholders', () => {
   const configPath = path.join(__dirname, '..', 'model-profiles.json');
   const models = JSON.parse(fs.readFileSync(configPath, 'utf8')).models;
   assert.equal(models.length, 4);
-  assert.ok(models.every(model => model.name === '' && model.modelId === '' && model.endpoint === ''));
+  // First two are Ollama examples, last two are empty placeholders
+  assert.ok(models[0].modelId === 'qwen2.5-coder:7b');
+  assert.ok(models[0].endpoint === 'http://localhost:11434/v1/chat/completions');
+  assert.ok(models[1].modelId === 'deepseek-r1:7b');
+  assert.ok(models[1].endpoint === 'http://localhost:11434/v1/chat/completions');
+  // Last two should be empty placeholders
+  assert.ok(models[2].name === '' && models[2].modelId === '' && models[2].endpoint === '');
+  assert.ok(models[3].name === '' && models[3].modelId === '' && models[3].endpoint === '');
   assert.equal(validateProfiles({ models: [] }).length, 0);
-  assert.ok(models.every(model => model.modelId === ''));
   assert.throws(() => validateProfiles({
     models: [{ name: 'Hosted model', modelId: '', endpoint: 'https://api.example.com/v1' }]
   }), /exact API modelId/);

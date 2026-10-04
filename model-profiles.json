@@ -1,15 +1,15 @@
 {
   "models": [
     {
-      "name": "",
-      "modelId": "",
-      "endpoint": "",
+      "name": "Qwen2.5 Coder 7B (Ollama)",
+      "modelId": "qwen2.5-coder:7b",
+      "endpoint": "http://localhost:11434/v1/chat/completions",
       "rpmLimit": 0
     },
     {
-      "name": "",
-      "modelId": "",
-      "endpoint": "",
+      "name": "DeepSeek R1 7B (Ollama)",
+      "modelId": "deepseek-r1:7b",
+      "endpoint": "http://localhost:11434/v1/chat/completions",
       "rpmLimit": 0
     },
     {
