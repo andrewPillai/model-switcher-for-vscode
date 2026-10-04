@@ -1,5 +1,7 @@
 'use strict';
 
+const { waitForRateLimit } = require('./rate-limiter');
+
 function normalizeEndpoint(value) {
   let url;
   try {
@@ -57,6 +59,8 @@ function validateProfiles(value) {
     }
     seen.add(key);
 
+    const rpmLimit = entry.rpmLimit !== undefined ? positiveInteger(entry.rpmLimit, 0) : 0;
+
     profiles.push({
       id: require('node:crypto').createHash('sha256').update(key).digest('hex').slice(0, 24),
       modelId,
@@ -64,6 +68,7 @@ function validateProfiles(value) {
       endpoint,
       maxInputTokens: positiveInteger(entry.maxInputTokens, 131072),
       maxOutputTokens: positiveInteger(entry.maxOutputTokens, 16384),
+      rpmLimit,
       capabilities: {
         toolCalling: entry.toolCalling !== false,
         imageInput: false
@@ -211,6 +216,9 @@ function connectionError(status) {
 }
 
 async function testModelConnection({ fetchImpl = fetch, profile, apiKey, signal }) {
+  // Wait for rate limit token before making request
+  await waitForRateLimit(profile, signal);
+  
   let response;
   try {
     response = await fetchImpl(profile.endpoint, {
@@ -251,6 +259,9 @@ async function testModelConnection({ fetchImpl = fetch, profile, apiKey, signal 
 }
 
 async function streamChatCompletion({ fetchImpl = fetch, profile, apiKey, messages, options, progress, token, vscode = require('vscode') }) {
+  // Wait for rate limit token before making request
+  await waitForRateLimit(profile, token);
+  
   const controller = new AbortController();
   const cancellation = token.onCancellationRequested(() => controller.abort());
 

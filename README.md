@@ -46,6 +46,9 @@ OpenAI-compatible Chat Completions endpoint.
    - `endpoint`: the provider's OpenAI-compatible Chat Completions URL. A full
      URL such as `https://api.example.com/v1/chat/completions` or a base URL
      ending in `/v1` is accepted.
+   - `rpmLimit` (optional): maximum requests per minute for this endpoint.
+     - For **NVIDIA NIM free tier**, this is **automatically set to 40 RPM** (hard limit).
+     - For other providers, set your desired limit (e.g., `60`, `100`) or omit/`0` for unlimited.
 3. Leave an unused row completely blank or remove it; partially completed rows
    are rejected. Duplicate rows in the `models` array to add more models.
 4. Save the file and run **Model Switcher: Apply Model Configuration**. Enter
@@ -64,7 +67,19 @@ Example entry (replace these example values with your provider's details):
 {
   "name": "My hosted model",
   "modelId": "provider/model-id-from-api-example",
-  "endpoint": "https://api.example.com/v1/chat/completions"
+  "endpoint": "https://api.example.com/v1/chat/completions",
+  "rpmLimit": 60
+}
+```
+
+Example NVIDIA NIM entry (40 RPM is enforced automatically):
+
+```json
+{
+  "name": "Nemotron 3 Ultra",
+  "modelId": "nvidia/nemotron-3-ultra",
+  "endpoint": "https://integrate.api.nvidia.com/v1/chat/completions"
+  // rpmLimit is automatically set to 40 for NVIDIA NIM endpoints
 }
 ```
 
@@ -77,10 +92,22 @@ The connection test provides explanations for common HTTP errors:
 - **404**: the model ID or endpoint was not found; verify the exact API model
   ID, including any required prefix.
 - **429**: a rate limit or account quota was reached.
+  - For **NVIDIA NIM free tier**, the extension enforces a **40 RPM hard limit** locally.
+    If you hit this, requests will queue and wait for the next available token.
+  - For other providers, check your configured `rpmLimit` or provider account limits.
 - **5xx**: the provider returned a server error; retry later.
 
 If VS Code says a selected model is unavailable after you edit its ID, start a
 new chat and choose that model again from the picker.
+
+### Rate Limiting
+
+The extension includes a built-in token bucket rate limiter:
+
+- **NVIDIA NIM endpoints** (`integrate.api.nvidia.com`, `api.nvidia.com`): **40 RPM hard limit** - automatically enforced, cannot be overridden.
+- **Other endpoints**: User-configurable via the `rpmLimit` field in the model configuration. Set to `0` or omit for unlimited.
+
+When a rate limit is reached, requests are queued and automatically retried when tokens become available. This prevents hitting provider-side rate limits and getting 429 errors.
 
 ## Build and test
 

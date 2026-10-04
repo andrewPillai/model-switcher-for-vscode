@@ -3,22 +3,26 @@
     {
       "name": "",
       "modelId": "",
-      "endpoint": ""
+      "endpoint": "",
+      "rpmLimit": 0
     },
     {
       "name": "",
       "modelId": "",
-      "endpoint": ""
+      "endpoint": "",
+      "rpmLimit": 0
     },
     {
       "name": "",
       "modelId": "",
-      "endpoint": ""
+      "endpoint": "",
+      "rpmLimit": 0
     },
     {
       "name": "",
       "modelId": "",
-      "endpoint": ""
+      "endpoint": "",
+      "rpmLimit": 0
     }
   ]
 }
