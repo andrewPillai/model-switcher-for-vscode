@@ -2,14 +2,14 @@
   "name": "nvidia-chat-model-switcher",
   "displayName": "Model Switcher for VS Code",
   "description": "Connect OpenAI-compatible chat model APIs to the VS Code Chat model picker.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "local-development",
   "engines": {
     "vscode": "^1.100.0"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/andrewPillai/nvidia-extension-installer.git"
+    "url": "https://github.com/andrewPillai/model-switcher-for-vscode.git"
   },
   "categories": [
     "Machine Learning"

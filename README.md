@@ -18,7 +18,7 @@ OpenAI-compatible Chat Completions endpoint.
 
 ## Install
 
-1. Download the latest [Model Switcher for VS Code VSIX](https://github.com/andrewPillai/nvidia-extension-installer/releases/latest).
+1. Download the latest [Model Switcher for VS Code VSIX](https://github.com/andrewPillai/model-switcher-for-vscode/releases/latest).
 2. In the VS Code desktop app, open **Extensions → … → Install from VSIX…**
    and select the downloaded `.vsix` file.
 3. If the extension's commands do not appear after installation, enable it for
