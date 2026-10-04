@@ -6,6 +6,7 @@ const path = require('node:path');
 const vscode = require('vscode');
 const {
   validateProfiles,
+  testModelConnection,
   streamChatCompletion
 } = require('./openai');
 
@@ -79,7 +80,8 @@ function activate(context) {
   context.subscriptions.push(
     vscode.lm.registerLanguageModelChatProvider(vendor, provider),
     vscode.commands.registerCommand('nvidia-chat-model-switcher.openConfig', () => openConfig(context, configPath)),
-    vscode.commands.registerCommand('nvidia-chat-model-switcher.applyConfig', () => applyConfig(context, configPath, emitter))
+    vscode.commands.registerCommand('nvidia-chat-model-switcher.applyConfig', () => applyConfig(context, configPath, emitter)),
+    vscode.commands.registerCommand('nvidia-chat-model-switcher.testModel', () => testConfiguredModel(context))
   );
   ensureConfigFile(context, configPath).catch(error => {
     vscode.window.showErrorMessage(`Could not create the model configuration file: ${error.message}`);
@@ -175,9 +177,62 @@ async function applyConfig(context, configPath, emitter) {
       vscode.window.showWarningMessage(`Configured ${profiles.length} model${profiles.length === 1 ? '' : 's'}, but could not remove ${cleanupFailures} unused saved API key${cleanupFailures === 1 ? '' : 's'}.`);
       return;
     }
-    vscode.window.showInformationMessage(`Configured ${profiles.length} API model${profiles.length === 1 ? '' : 's'}. Select one from the Chat model picker.`);
+    const changedModels = previous.some(oldProfile => {
+      const current = profiles.find(profile => profile.id === oldProfile.id);
+      return !current || current.modelId !== oldProfile.modelId || current.endpoint !== oldProfile.endpoint;
+    });
+    const guidance = changedModels
+      ? 'Model IDs or endpoints changed. Start a new chat and reselect a model to clear any stale selection.'
+      : 'Select a model from the Chat picker. Use "NVIDIA Chat Models: Test Model Connection" to verify its ID, endpoint, and API key first.';
+    vscode.window.showInformationMessage(`Configured ${profiles.length} API model${profiles.length === 1 ? '' : 's'}. ${guidance}`);
   } catch (error) {
     vscode.window.showErrorMessage(`Could not apply model configuration: ${error.message}`);
+  }
+}
+
+async function testConfiguredModel(context) {
+  try {
+    const profiles = context.globalState.get(profileStateKey, []);
+    const available = [];
+    for (const profile of profiles) {
+      if (await context.secrets.get(secretKey(profile))) {
+        available.push({
+          label: profile.name,
+          description: profile.modelId,
+          detail: new URL(profile.endpoint).host,
+          profile
+        });
+      }
+    }
+    if (!available.length) {
+      vscode.window.showWarningMessage('No models with saved API keys are configured. Apply your model configuration first.');
+      return;
+    }
+
+    const selected = await vscode.window.showQuickPick(available, {
+      title: 'Choose a model to test',
+      placeHolder: 'A short test request will be sent to the provider.'
+    });
+    if (!selected) {
+      return;
+    }
+    const confirmed = await vscode.window.showWarningMessage(
+      `Send a small test request to ${selected.profile.name}? The provider may charge for this request.`,
+      { modal: true },
+      'Send test request'
+    );
+    if (confirmed !== 'Send test request') {
+      return;
+    }
+
+    const apiKey = await context.secrets.get(secretKey(selected.profile));
+    if (!apiKey) {
+      throw new Error(`No API key is saved for ${selected.profile.name}. Reapply the configuration to add one.`);
+    }
+    await testModelConnection({ profile: selected.profile, apiKey });
+    vscode.window.showInformationMessage(`${selected.profile.name} responded successfully. Its model ID, endpoint, and API key are working.`);
+  } catch (error) {
+    vscode.window.showErrorMessage(`Model connection test failed: ${error.message}`);
   }
 }
 

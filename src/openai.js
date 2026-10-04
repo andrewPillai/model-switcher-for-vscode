@@ -44,7 +44,7 @@ function validateProfiles(value) {
       continue;
     }
     if (!name || !modelId || !endpointText) {
-      throw new Error(`Model ${index + 1} needs a name, modelId, and endpoint. Leave all three blank to skip a placeholder.`);
+      throw new Error(`Model ${index + 1} needs a name, exact API modelId, and endpoint. Copy the model ID from the provider's API sample, including any provider prefix, or leave all three fields blank to skip this entry.`);
     }
     if (entry.imageInput === true) {
       throw new Error(`Model ${index + 1} enables image input, which this extension does not support yet.`);
@@ -191,6 +191,65 @@ function parseSseBlock(block) {
   }
 }
 
+function connectionError(status) {
+  if (status === 401) {
+    return 'The provider rejected the API key (HTTP 401). Replace the saved key and try again.';
+  }
+  if (status === 403) {
+    return 'The API key does not have access to this model (HTTP 403). Check your provider account and model permissions.';
+  }
+  if (status === 404) {
+    return 'The provider could not find this model or endpoint (HTTP 404). Copy the exact API model ID from the provider sample request, including any prefix such as "nvidia/".';
+  }
+  if (status === 429) {
+    return 'The provider rate limit or account quota was reached (HTTP 429). Check your provider account and try again later.';
+  }
+  if (status >= 500) {
+    return `The model provider returned a server error (HTTP ${status}). Try again later or check the provider status page.`;
+  }
+  return `The provider rejected the request (HTTP ${status}). Check the endpoint, model ID, and model API compatibility.`;
+}
+
+async function testModelConnection({ fetchImpl = fetch, profile, apiKey, signal }) {
+  let response;
+  try {
+    response = await fetchImpl(profile.endpoint, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+        accept: 'application/json'
+      },
+      body: JSON.stringify({
+        model: profile.modelId,
+        messages: [{ role: 'user', content: 'Reply with OK.' }],
+        max_tokens: 1,
+        stream: false
+      }),
+      signal
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw error;
+    }
+    throw new Error('Could not reach the model provider. Check your internet connection and endpoint URL.');
+  }
+
+  if (!response.ok) {
+    throw new Error(connectionError(response.status));
+  }
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error('The endpoint returned a successful status but not a valid JSON chat response. Check that it supports Chat Completions.');
+  }
+  if (typeof result.choices?.[0]?.message?.content !== 'string') {
+    throw new Error('The endpoint response did not contain a chat completion. Check that the model ID supports Chat Completions.');
+  }
+  return true;
+}
+
 async function streamChatCompletion({ fetchImpl = fetch, profile, apiKey, messages, options, progress, token, vscode = require('vscode') }) {
   const controller = new AbortController();
   const cancellation = token.onCancellationRequested(() => controller.abort());
@@ -221,7 +280,7 @@ async function streamChatCompletion({ fetchImpl = fetch, profile, apiKey, messag
     });
 
     if (!response.ok) {
-      throw new Error(`Model request failed (HTTP ${response.status}). Check the model ID, endpoint, and API key.`);
+      throw new Error(connectionError(response.status));
     }
     if (!response.body) {
       throw new Error('The model endpoint did not return a streaming response.');
@@ -304,5 +363,7 @@ module.exports = {
   toOpenAIMessages,
   toOpenAITools,
   parseSseBlock,
+  connectionError,
+  testModelConnection,
   streamChatCompletion
 };

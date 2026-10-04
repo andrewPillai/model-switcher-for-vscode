@@ -2,7 +2,7 @@
   "name": "nvidia-chat-model-switcher",
   "displayName": "NVIDIA Chat Model Switcher",
   "description": "Use OpenAI-compatible API models in the VS Code Chat model picker.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "local-development",
   "engines": {
     "vscode": "^1.100.0"
@@ -18,7 +18,8 @@
   "activationEvents": [
     "onStartupFinished",
     "onCommand:nvidia-chat-model-switcher.openConfig",
-    "onCommand:nvidia-chat-model-switcher.applyConfig"
+    "onCommand:nvidia-chat-model-switcher.applyConfig",
+    "onCommand:nvidia-chat-model-switcher.testModel"
   ],
   "contributes": {
     "commands": [
@@ -29,6 +30,10 @@
       {
         "command": "nvidia-chat-model-switcher.applyConfig",
         "title": "NVIDIA Chat Models: Apply Model Configuration"
+      },
+      {
+        "command": "nvidia-chat-model-switcher.testModel",
+        "title": "NVIDIA Chat Models: Test Model Connection"
       }
     ],
     "languageModelChatProviders": [
@@ -40,7 +45,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "package": "vsce package"
+    "package": "vsce package --no-dependencies"
   },
   "devDependencies": {
     "@vscode/vsce": "^4.0.0"

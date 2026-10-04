@@ -4,12 +4,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const manifest = require('../package.json');
 const {
   normalizeEndpoint,
   validateProfiles,
   toOpenAIMessages,
   toOpenAITools,
   parseSseBlock,
+  connectionError,
+  testModelConnection,
   streamChatCompletion
 } = require('../src/openai');
 
@@ -53,15 +56,26 @@ test('validates profiles, ignores empty placeholders, and rejects keys in config
   }), /more than once/);
 });
 
-test('ships the three provided NVIDIA models and a blank slot for the fourth', () => {
+test('ships friendly model labels without guessing provider model IDs', () => {
   const configPath = path.join(__dirname, '..', 'model-profiles.json');
-  const profiles = validateProfiles(JSON.parse(fs.readFileSync(configPath, 'utf8')));
-  assert.deepEqual(profiles.map(profile => profile.modelId), [
-    'nemotron-3.5-lightning-30b-a3b',
-    'kimi-k3',
-    'gemma-4-31b-it'
+  const models = JSON.parse(fs.readFileSync(configPath, 'utf8')).models;
+  assert.deepEqual(models.map(model => model.name), [
+    'Nemotron 3.5 Lightning 30B A3B',
+    'Kimi K3',
+    'Gemma 4 31B IT',
+    ''
   ]);
-  assert.ok(profiles.every(profile => profile.endpoint === 'https://integrate.api.nvidia.com/v1/chat/completions'));
+  assert.ok(models.every(model => model.modelId === ''));
+  assert.ok(models.slice(0, 3).every(model => model.endpoint === 'https://integrate.api.nvidia.com/v1/chat/completions'));
+  assert.throws(() => validateProfiles(JSON.parse(fs.readFileSync(configPath, 'utf8'))), /exact API modelId/);
+});
+
+test('registers every user-facing command for command-palette activation', () => {
+  const commands = manifest.contributes.commands.map(command => command.command);
+  for (const command of commands) {
+    assert.ok(manifest.activationEvents.includes(`onCommand:${command}`), `${command} should activate the extension`);
+  }
+  assert.ok(commands.includes('nvidia-chat-model-switcher.testModel'));
 });
 
 test('maps assistant tool calls and tool results to OpenAI chat messages', () => {
@@ -125,6 +139,58 @@ test('parses SSE data and ignores keepalives and the terminal marker', () => {
   assert.equal(parseSseBlock(': keepalive'), undefined);
   assert.equal(parseSseBlock('data: [DONE]'), undefined);
   assert.throws(() => parseSseBlock('data: not-json'), /invalid streaming response/);
+});
+
+test('translates common provider statuses into actionable diagnostics', () => {
+  assert.match(connectionError(401), /Replace the saved key/);
+  assert.match(connectionError(403), /model permissions/);
+  assert.match(connectionError(404), /exact API model ID/);
+  assert.match(connectionError(429), /quota/);
+  assert.match(connectionError(503), /server error/);
+  assert.match(connectionError(422), /model API compatibility/);
+});
+
+test('tests model ID and credentials with a small non-streaming request', async () => {
+  let request;
+  await testModelConnection({
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return Response.json({ choices: [{ message: { content: 'OK' } }] });
+    },
+    profile: {
+      modelId: 'nvidia/nemotron-3-ultra-550b-a55b',
+      endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions'
+    },
+    apiKey: 'unit-test-key'
+  });
+  const body = JSON.parse(request.options.body);
+  assert.equal(request.url, 'https://integrate.api.nvidia.com/v1/chat/completions');
+  assert.equal(request.options.headers.authorization, 'Bearer unit-test-key');
+  assert.equal(body.model, 'nvidia/nemotron-3-ultra-550b-a55b');
+  assert.equal(body.stream, false);
+  assert.equal(body.max_tokens, 1);
+});
+
+test('test connection reports a wrong model ID with provider-specific guidance', async () => {
+  await assert.rejects(testModelConnection({
+    fetchImpl: async () => new Response('', { status: 404 }),
+    profile: {
+      modelId: 'wrong-name-only',
+      endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions'
+    },
+    apiKey: 'unit-test-key'
+  }), /exact API model ID/);
+});
+
+test('test connection rejects success responses without a chat completion', async () => {
+  await assert.rejects(testModelConnection({
+    fetchImpl: async () => Response.json({ object: 'list' }),
+    profile: {
+      modelId: 'some-model',
+      endpoint: 'https://example.com/v1/chat/completions'
+    },
+    apiKey: 'unit-test-key'
+  }), /did not contain a chat completion/);
 });
 
 test('streams text and assembled tool calls using the endpoint model ID', async () => {
